@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delhi AQI Predictor</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(to right, #74ebd5, #9face6);
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            width: 420px;
+            margin: auto;
+            box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+        }
+
+        input {
+            width: 90%;
+            padding: 8px;
+            margin: 6px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 95%;
+            margin-top: 10px;
+        }
+
+        .report {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f5f5f5;
+            text-align: left;
+        }
+
+        .highlight {
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>Delhi AQI Prediction System</h2>
+
+    <form action="/predict" method="post">
+
+        <input name="pm25" placeholder="PM2.5" value="{{ form_data.pm25 if form_data else '' }}"><br>
+        <input name="pm10" placeholder="PM10" value="{{ form_data.pm10 if form_data else '' }}"><br>
+        <input name="no2" placeholder="NO2" value="{{ form_data.no2 if form_data else '' }}"><br>
+        <input name="co" placeholder="CO" value="{{ form_data.co if form_data else '' }}"><br>
+        <input name="ozone" placeholder="Ozone" value="{{ form_data.ozone if form_data else '' }}"><br>
+
+        <input name="month" placeholder="Month (1-12)" value="{{ form_data.month if form_data else '' }}"><br>
+        <input name="day" placeholder="Day (1-7)" value="{{ form_data.day if form_data else '' }}"><br>
+        <input name="holiday" placeholder="Holiday (0 or 1)" value="{{ form_data.holiday if form_data else '' }}"><br>
+
+        <button type="submit">Generate AQI Report</button>
+    </form>
+
+    {% if prediction %}
+    <div class="report" style="border-left: 6px solid {{ color }};">
+
+        <h3 style="color: {{ color }}">Air Quality Report</h3>
+
+        <p><span class="highlight">Predicted AQI:</span> {{ prediction }}</p>
+
+        <p><span class="highlight">Category:</span>
+            <span style="color: {{ color }}">{{ category }}</span>
+        </p>
+
+        <p><span class="highlight">Health Advisory:</span> {{ advice }}</p>
+
+        <hr>
+
+        <p><span class="highlight">Input Summary:</span></p>
+        <ul>
+            <li>PM2.5: {{ form_data.pm25 }}</li>
+            <li>PM10: {{ form_data.pm10 }}</li>
+            <li>NO2: {{ form_data.no2 }}</li>
+            <li>CO: {{ form_data.co }}</li>
+            <li>Ozone: {{ form_data.ozone }}</li>
+            <li>Month: {{ form_data.month }}</li>
+            <li>Day: {{ form_data.day }}</li>
+            <li>Holiday: {{ form_data.holiday }}</li>
+        </ul>
+
+    </div>
+    {% endif %}
+
+    <img src="{{ url_for('static', filename='shap_summary.png') }}" width="100%">
+
+</div>
+
+</body>
+</html>
