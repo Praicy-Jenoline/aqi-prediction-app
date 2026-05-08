@@ -1,8 +1,10 @@
-Flask
-gunicorn
+flask
 pandas
-numpy==1.26.4
+numpy
 scikit-learn
-joblib
 matplotlib
 shap
+xgboost
+scipy
+gunicorn
+joblib

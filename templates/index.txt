@@ -1,55 +1,88 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+
     <title>Delhi AQI Predictor</title>
 
     <style>
-        body {
+
+        body{
             font-family: Arial;
             background: linear-gradient(to right, #74ebd5, #9face6);
-            text-align: center;
-            padding: 20px;
+            padding:20px;
         }
 
-        .container {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            width: 420px;
-            margin: auto;
-            box-shadow: 0px 0px 15px rgba(0,0,0,0.2);
+        .container{
+            width:850px;
+            margin:auto;
+            background:white;
+            padding:30px;
+            border-radius:15px;
+            box-shadow:0px 0px 15px rgba(0,0,0,0.2);
         }
 
-        input {
-            width: 90%;
-            padding: 8px;
-            margin: 6px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+        h1,h2,h3{
+            text-align:center;
         }
 
-        button {
-            background: #4CAF50;
-            color: white;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 95%;
-            margin-top: 10px;
+        form{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:12px;
+            margin-top:20px;
         }
 
-        .report {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            background: #f5f5f5;
-            text-align: left;
+        input{
+            padding:12px;
+            border-radius:8px;
+            border:1px solid #ccc;
         }
 
-        .highlight {
-            font-weight: bold;
+        button{
+            grid-column:span 2;
+            padding:14px;
+            background:#4CAF50;
+            color:white;
+            border:none;
+            border-radius:10px;
+            font-size:16px;
+            cursor:pointer;
         }
+
+        button:hover{
+            background:#388E3C;
+        }
+
+        .report{
+            margin-top:30px;
+            background:#f5f5f5;
+            padding:25px;
+            border-radius:12px;
+        }
+
+        .aqi{
+            font-size:28px;
+            color:#d32f2f;
+            font-weight:bold;
+        }
+
+        .category{
+            font-size:22px;
+            color:#1976D2;
+            font-weight:bold;
+        }
+
+        ul{
+            line-height:2;
+        }
+
+        .shap-img{
+            width:100%;
+            margin-top:20px;
+            border-radius:12px;
+        }
+
     </style>
 
 </head>
@@ -58,54 +91,79 @@
 
 <div class="container">
 
-    <h2>Delhi AQI Prediction System</h2>
+    <h1>Delhi AQI Prediction System</h1>
 
-    <form action="/predict" method="post">
+    <form action="/predict" method="POST">
 
-        <input name="pm25" placeholder="PM2.5" value="{{ form_data.pm25 if form_data else '' }}"><br>
-        <input name="pm10" placeholder="PM10" value="{{ form_data.pm10 if form_data else '' }}"><br>
-        <input name="no2" placeholder="NO2" value="{{ form_data.no2 if form_data else '' }}"><br>
-        <input name="co" placeholder="CO" value="{{ form_data.co if form_data else '' }}"><br>
-        <input name="ozone" placeholder="Ozone" value="{{ form_data.ozone if form_data else '' }}"><br>
+        {% for feature in features %}
 
-        <input name="month" placeholder="Month (1-12)" value="{{ form_data.month if form_data else '' }}"><br>
-        <input name="day" placeholder="Day (1-7)" value="{{ form_data.day if form_data else '' }}"><br>
-        <input name="holiday" placeholder="Holiday (0 or 1)" value="{{ form_data.holiday if form_data else '' }}"><br>
+            <input
+                type="text"
+                name="{{ feature }}"
+                placeholder="{{ feature }}"
+                required
+            >
 
-        <button type="submit">Generate AQI Report</button>
+        {% endfor %}
+
+        <button type="submit">
+            Predict AQI
+        </button>
+
     </form>
 
     {% if prediction %}
-    <div class="report" style="border-left: 6px solid {{ color }};">
 
-        <h3 style="color: {{ color }}">Air Quality Report</h3>
+    <div class="report">
 
-        <p><span class="highlight">Predicted AQI:</span> {{ prediction }}</p>
+        <h2>Air Quality Report</h2>
 
-        <p><span class="highlight">Category:</span>
-            <span style="color: {{ color }}">{{ category }}</span>
+        <p class="aqi">
+            AQI: {{ prediction }}
         </p>
 
-        <p><span class="highlight">Health Advisory:</span> {{ advice }}</p>
+        <p class="category">
+            {{ category }}
+        </p>
+
+        <p>
+            <strong>Health Advice:</strong>
+            {{ advice }}
+        </p>
 
         <hr>
 
-        <p><span class="highlight">Input Summary:</span></p>
+        <h3>Environmental Summary</h3>
+
         <ul>
-            <li>PM2.5: {{ form_data.pm25 }}</li>
-            <li>PM10: {{ form_data.pm10 }}</li>
-            <li>NO2: {{ form_data.no2 }}</li>
-            <li>CO: {{ form_data.co }}</li>
-            <li>Ozone: {{ form_data.ozone }}</li>
-            <li>Month: {{ form_data.month }}</li>
-            <li>Day: {{ form_data.day }}</li>
-            <li>Holiday: {{ form_data.holiday }}</li>
+
+            {% for key, value in report.items() %}
+
+                <li>
+                    <strong>{{ key }}:</strong>
+                    {{ value }}
+                </li>
+
+            {% endfor %}
+
         </ul>
 
     </div>
+
+    {% if shap_generated %}
+
+        <h2>
+            Dynamic SHAP Explanation
+        </h2>
+
+        <img
+            class="shap-img"
+            src="{{ url_for('static', filename='shap_single.png') }}"
+        >
+
     {% endif %}
 
-    <img src="{{ url_for('static', filename='shap_summary.png') }}" width="100%">
+    {% endif %}
 
 </div>
 

@@ -5,81 +5,253 @@
 
 
 from flask import Flask, render_template, request
+import pandas as pd
 import joblib
-import numpy as np
+import shap
+import matplotlib
+
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import os
+
 from utils import classify_aqi
 
 app = Flask(__name__)
 
+# ---------------------------------------------------
+# LOAD MODEL + FEATURES
+# ---------------------------------------------------
 model = joblib.load("model.pkl")
+feature_names = joblib.load("features.pkl")
 
-# Color mapping
-def get_color(category):
-    colors = {
-        "Good": "green",
-        "Satisfactory": "lightgreen",
-        "Moderate": "orange",
-        "Poor": "red",
-        "Very Poor": "darkred",
-        "Severe": "purple"
-    }
-    return colors.get(category, "black")
+print("Loaded Model:", type(model).__name__)
 
+# ---------------------------------------------------
+# LOCATION MAP
+# ---------------------------------------------------
+location_map = {
+    0: "Delhi",
+    1: "Faridabad",
+    2: "Ghaziabad",
+    3: "Gurgaon",
+    4: "Noida"
+}
+
+# ---------------------------------------------------
+# SHAP EXPLAINER FOR LIGHTGBM
+# ---------------------------------------------------
+try:
+
+    explainer = shap.TreeExplainer(model)
+
+    print("SHAP Loaded Successfully")
+
+except Exception as e:
+
+    print("SHAP Error:", e)
+
+    explainer = None
+
+# ---------------------------------------------------
+# FEATURES SHOWN IN UI
+# ---------------------------------------------------
+visible_features = [
+    "location_name",
+    "location_lat",
+    "location_lon",
+    "hour",
+    "day",
+    "month",
+    "year",
+    "day_of_week",
+    "is_weekend",
+    "pollution_index"
+]
+
+# ---------------------------------------------------
+# HOME PAGE
+# ---------------------------------------------------
 @app.route('/')
 def home():
-    return render_template('index.html')
 
+    return render_template(
+        "index.html",
+        features=visible_features
+    )
+
+# ---------------------------------------------------
+# PREDICT ROUTE
+# ---------------------------------------------------
 @app.route('/predict', methods=['POST'])
 def predict():
+
     try:
-        # Store form inputs
-        form_data = {
-            'pm25': request.form['pm25'],
-            'pm10': request.form['pm10'],
-            'no2': request.form['no2'],
-            'co': request.form['co'],
-            'ozone': request.form['ozone'],
-            'month': request.form['month'],
-            'day': request.form['day'],
-            'holiday': request.form['holiday']
+
+        # ---------------------------------------------------
+        # USER INPUT
+        # ---------------------------------------------------
+        input_data = {}
+
+        for feature in visible_features:
+
+            value = request.form.get(feature)
+
+            if value is None or value == "":
+                return f"Missing value for {feature}"
+
+            input_data[feature] = float(value)
+
+        # ---------------------------------------------------
+        # CREATE TIMESTAMP FEATURES
+        # ---------------------------------------------------
+        input_data["ts_hour"] = input_data["hour"]
+        input_data["ts_day"] = input_data["day"]
+        input_data["ts_month"] = input_data["month"]
+        input_data["ts_year"] = input_data["year"]
+
+        # ---------------------------------------------------
+        # FEATURE ORDER
+        # ---------------------------------------------------
+        final_input = {}
+
+        for feature in feature_names:
+
+            final_input[feature] = input_data[feature]
+
+        # ---------------------------------------------------
+        # DATAFRAME
+        # ---------------------------------------------------
+        input_df = pd.DataFrame([final_input])
+
+        # ---------------------------------------------------
+        # PREDICTION
+        # ---------------------------------------------------
+        prediction = model.predict(input_df)[0]
+
+        # ---------------------------------------------------
+        # AQI CATEGORY + ADVICE
+        # ---------------------------------------------------
+        category, advice = classify_aqi(prediction)
+
+        # ---------------------------------------------------
+        # LOCATION NAME
+        # ---------------------------------------------------
+        location_name = location_map.get(
+            int(input_data["location_name"]),
+            "Unknown"
+        )
+
+        # ---------------------------------------------------
+        # CLEAN REPORT
+        # ---------------------------------------------------
+        report = {
+
+            "Location": location_name,
+
+            "Coordinates":
+                f"{input_data['location_lat']}, "
+                f"{input_data['location_lon']}",
+
+            "Date":
+                f"{int(input_data['day'])}/"
+                f"{int(input_data['month'])}/"
+                f"{int(input_data['year'])}",
+
+            "Hour":
+                int(input_data["hour"]),
+
+            "Weekend":
+                "Yes" if input_data["is_weekend"] == 1 else "No",
+
+            "Pollution Index":
+                round(input_data["pollution_index"], 2)
         }
 
-        data = np.array([[
-            float(form_data['pm25']),
-            float(form_data['pm10']),
-            float(form_data['no2']),
-            float(form_data['co']),
-            float(form_data['ozone']),
-            float(form_data['month']),
-            float(form_data['day']),
-            float(form_data['holiday'])
-        ]])
+        # ---------------------------------------------------
+        # REMOVE OLD SHAP IMAGE
+        # ---------------------------------------------------
+        shap_path = "static/shap_single.png"
 
-        prediction = model.predict(data)[0]
-        category = classify_aqi(prediction)
-        color = get_color(category)
+        if os.path.exists(shap_path):
 
-        # Simple health message
-        if category in ["Good", "Satisfactory"]:
-            advice = "Air quality is acceptable. Minimal impact on health."
-        elif category in ["Moderate", "Poor"]:
-            advice = "Sensitive individuals should reduce outdoor activity."
-        else:
-            advice = "Health alert: Avoid outdoor exposure. Wear masks."
+            os.remove(shap_path)
 
+        # ---------------------------------------------------
+        # GENERATE DYNAMIC SHAP
+        # ---------------------------------------------------
+        shap_generated = False
+
+        if explainer is not None:
+
+            try:
+
+                # -------------------------------------------
+                # SHAP VALUES
+                # -------------------------------------------
+                shap_values = explainer.shap_values(input_df)
+
+                # -------------------------------------------
+                # CREATE FIGURE
+                # -------------------------------------------
+                plt.figure(figsize=(14, 7))
+
+                # -------------------------------------------
+                # MODERN SHAP WATERFALL
+                # -------------------------------------------
+                shap.plots.waterfall(
+
+                    shap.Explanation(
+                        values=shap_values[0],
+                        base_values=explainer.expected_value,
+                        data=input_df.iloc[0],
+                        feature_names=feature_names
+                    ),
+
+                    show=False
+                )
+
+                # -------------------------------------------
+                # SAVE IMAGE
+                # -------------------------------------------
+                plt.tight_layout()
+
+                plt.savefig(
+                    shap_path,
+                    bbox_inches='tight',
+                    dpi=300
+                )
+
+                plt.close()
+
+                shap_generated = True
+
+                print("SHAP graph generated successfully")
+
+            except Exception as shap_error:
+
+                print("SHAP Generation Error:", shap_error)
+
+        # ---------------------------------------------------
+        # RETURN RESULT
+        # ---------------------------------------------------
         return render_template(
-            'index.html',
+            "index.html",
             prediction=round(prediction, 2),
             category=category,
-            color=color,
             advice=advice,
-            form_data=form_data
+            report=report,
+            shap_generated=shap_generated,
+            features=visible_features
         )
 
     except Exception as e:
-        return render_template('index.html', error=str(e))
 
+        return f"Error: {str(e)}"
 
+# ---------------------------------------------------
+# RUN APP
+# ---------------------------------------------------
 if __name__ == "__main__":
+
     app.run(debug=True)
 
