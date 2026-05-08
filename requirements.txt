@@ -1,10 +1,11 @@
 flask
+gunicorn
 pandas
 numpy
 scikit-learn
 matplotlib
-shap
-xgboost
-scipy
-gunicorn
 joblib
+shap
+xgboost==2.1.1
+lightgbm==4.5.0
+scipy
