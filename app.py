@@ -8,11 +8,13 @@ from flask import Flask, render_template, request
 import pandas as pd
 import joblib
 import shap
+import os
 import matplotlib
 
-matplotlib.use('Agg')
+# IMPORTANT FOR RENDER
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
-import os
 
 from utils import classify_aqi
 
@@ -36,21 +38,6 @@ location_map = {
     3: "Gurgaon",
     4: "Noida"
 }
-
-# ---------------------------------------------------
-# SHAP EXPLAINER FOR LIGHTGBM
-# ---------------------------------------------------
-try:
-
-    explainer = shap.TreeExplainer(model)
-
-    print("SHAP Loaded Successfully")
-
-except Exception as e:
-
-    print("SHAP Error:", e)
-
-    explainer = None
 
 # ---------------------------------------------------
 # FEATURES SHOWN IN UI
@@ -177,59 +164,52 @@ def predict():
             os.remove(shap_path)
 
         # ---------------------------------------------------
-        # GENERATE DYNAMIC SHAP
+        # GENERATE SHAP ONLY AFTER PREDICTION
         # ---------------------------------------------------
         shap_generated = False
 
-        if explainer is not None:
+        try:
 
-            try:
+            # LOAD SHAP ONLY WHEN NEEDED
+            explainer = shap.TreeExplainer(model)
 
-                # -------------------------------------------
-                # SHAP VALUES
-                # -------------------------------------------
-                shap_values = explainer.shap_values(input_df)
+            # SHAP VALUES
+            shap_values = explainer.shap_values(input_df)
 
-                # -------------------------------------------
-                # CREATE FIGURE
-                # -------------------------------------------
-                plt.figure(figsize=(14, 7))
+            # CREATE FIGURE
+            plt.figure(figsize=(14, 7))
 
-                # -------------------------------------------
-                # MODERN SHAP WATERFALL
-                # -------------------------------------------
-                shap.plots.waterfall(
+            # WATERFALL PLOT
+            shap.plots.waterfall(
 
-                    shap.Explanation(
-                        values=shap_values[0],
-                        base_values=explainer.expected_value,
-                        data=input_df.iloc[0],
-                        feature_names=feature_names
-                    ),
+                shap.Explanation(
+                    values=shap_values[0],
+                    base_values=explainer.expected_value,
+                    data=input_df.iloc[0],
+                    feature_names=feature_names
+                ),
 
-                    show=False
-                )
+                show=False
+            )
 
-                # -------------------------------------------
-                # SAVE IMAGE
-                # -------------------------------------------
-                plt.tight_layout()
+            # SAVE IMAGE
+            plt.tight_layout()
 
-                plt.savefig(
-                    shap_path,
-                    bbox_inches='tight',
-                    dpi=300
-                )
+            plt.savefig(
+                shap_path,
+                bbox_inches='tight',
+                dpi=300
+            )
 
-                plt.close()
+            plt.close()
 
-                shap_generated = True
+            shap_generated = True
 
-                print("SHAP graph generated successfully")
+            print("SHAP graph generated successfully")
 
-            except Exception as shap_error:
+        except Exception as shap_error:
 
-                print("SHAP Generation Error:", shap_error)
+            print("SHAP Generation Error:", shap_error)
 
         # ---------------------------------------------------
         # RETURN RESULT
